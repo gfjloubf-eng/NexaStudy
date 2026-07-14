@@ -7,3 +7,572 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// =============================
+/// Common audit fields
+/// - Soft delete supported via deletedAt
+/// =============================
+
+model User {
+  id         String   @id @default(uuid()) @db.Uuid
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  email    String  
+  username String
+
+  organizationMemberships OrganizationMember[] @relation("OrganizationMembersUser")
+
+  sessions                Session[] @relation("UserSessions")
+  verificationTokens      VerificationToken[] @relation("UserVerificationTokens")
+  passwordResetTokens     PasswordResetToken[] @relation("UserPasswordResetTokens")
+  emailVerificationTokens EmailVerificationToken[] @relation("UserEmailVerificationTokens")
+
+  courseEnrollments       CourseEnrollment[] @relation("UserCourseEnrollments")
+  assignmentSubmissions    AssignmentSubmission[] @relation("UserAssignmentSubmissions")
+  examAttempts             ExamAttempt[] @relation("UserExamAttempts")
+  examResponses            ExamResponse[] @relation("UserExamResponses")
+
+  notifications            Notification[] @relation("UserNotifications")
+  notificationReads        NotificationRead[] @relation("NotificationReadsUser")
+
+  auditLogs                AuditLog[] @relation("AuditLogsUser")
+  eventLogs                EventLog[] @relation("EventLogsUser")
+
+  attachments              Attachment[] @relation("UserAttachments")
+  progressSnapshots       ProgressSnapshot[] @relation("UserProgressSnapshots")
+
+  @@unique([email])
+  @@unique([username])
+  @@index([email])
+}
+
+model Organization {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  name String
+  slug String
+
+  members   OrganizationMember[] @relation("OrganizationMembersOrganization")
+  courses   Course[] @relation("OrganizationCourses")
+  roles     Role[]
+
+  auditLogs AuditLog[] @relation("AuditLogsOrganization")
+  eventLogs EventLog[] @relation("EventLogsOrganization")
+
+  @@unique([slug])
+  @@index([slug])
+}
+
+model OrganizationMember {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organizationId String @db.Uuid
+  userId         String @db.Uuid
+
+  status String
+
+  organization Organization @relation("OrganizationMembersOrganization", fields: [organizationId], references: [id], onDelete: Restrict)
+  user         User         @relation("OrganizationMembersUser", fields: [userId], references: [id], onDelete: Restrict)
+
+  roleBindings OrganizationRoleBinding[] @relation("MembershipRoleBindingsMembership")
+
+  @@unique([organizationId, userId])
+  @@index([organizationId, userId])
+  @@index([userId, organizationId])
+}
+
+model Role {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  code String
+  name String
+
+  organizationId String @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  roleBindings OrganizationRoleBinding[] @relation("MembershipRoleBindingsRole")
+
+  @@unique([code])
+}
+
+
+model OrganizationRoleBinding {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  membershipId String @db.Uuid
+  roleId        String @db.Uuid
+
+  membership OrganizationMember @relation("MembershipRoleBindingsMembership", fields: [membershipId], references: [id], onDelete: Restrict)
+  role        Role               @relation("MembershipRoleBindingsRole", fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([membershipId, roleId])
+  @@index([membershipId, roleId])
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  userId            String @db.Uuid
+  refreshTokenHash String
+
+  user User @relation("UserSessions", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([refreshTokenHash])
+  @@index([userId, createdAt])
+}
+
+model VerificationToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  userId    String   @db.Uuid
+  tokenHash String
+  expiresAt DateTime
+
+  user User @relation("UserVerificationTokens", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([tokenHash])
+  @@index([userId, expiresAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  userId    String   @db.Uuid
+  tokenHash String
+  expiresAt DateTime
+
+  user User @relation("UserPasswordResetTokens", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([tokenHash])
+  @@index([userId, expiresAt])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  userId    String   @db.Uuid
+  tokenHash String
+  expiresAt DateTime
+
+  user User @relation("UserEmailVerificationTokens", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([tokenHash])
+  @@index([userId, expiresAt])
+}
+
+model Course {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organizationId String @db.Uuid
+  slug            String
+  title           String
+  description     String?
+
+  organization Organization @relation("OrganizationCourses", fields: [organizationId], references: [id], onDelete: Restrict)
+
+  enrollments CourseEnrollment[] @relation("CourseEnrollments")
+  lessons     Lesson[] @relation("CourseLessons")
+  assignments Assignment[] @relation("CourseAssignments")
+  exams        Exam[] @relation("CourseExams")
+
+  courseTags   CourseTag[] @relation("CourseTagsCourse")
+  progressSnapshots ProgressSnapshot[] @relation("CourseProgressSnapshots")
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, createdAt])
+}
+
+model CourseEnrollment {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  userId   String @db.Uuid
+  courseId String @db.Uuid
+
+  status           String
+  progressPointer  String?
+
+  user   User   @relation("UserCourseEnrollments", fields: [userId], references: [id], onDelete: Restrict)
+  course Course @relation("CourseEnrollments", fields: [courseId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, courseId])
+  @@index([userId, courseId])
+  @@index([courseId, userId])
+}
+
+model Lesson {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  courseId    String @db.Uuid
+  slug        String
+  title       String
+  orderIndex  Int
+
+  course Course @relation("CourseLessons", fields: [courseId], references: [id], onDelete: Restrict)
+
+  content LessonContent? @relation("LessonContentLesson")
+  lessonAssets LessonAsset[] @relation("LessonAssets")
+  lessonTags   LessonTag[] @relation("LessonTagsLesson")
+
+  assignments Assignment[] @relation("LessonAssignments")
+
+
+  progressSnapshots ProgressSnapshot[] @relation("LessonProgressSnapshots")
+
+  @@unique([courseId, slug])
+  @@index([courseId, orderIndex])
+  @@index([courseId, slug])
+}
+
+model LessonContent {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  lessonId String @unique @db.Uuid
+  contentType String
+  contentPayload String
+
+  lesson Lesson @relation("LessonContentLesson", fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
+}
+
+model LessonAsset {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  lessonId   String @db.Uuid
+  orderIndex Int
+  assetType  String
+  fileRef    String
+
+  lesson Lesson @relation("LessonAssets", fields: [lessonId], references: [id], onDelete: Restrict)
+
+  @@index([lessonId, orderIndex])
+}
+
+model Tag {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organizationId String @db.Uuid
+  name            String
+
+  courseTags CourseTag[] @relation("CourseTagsTag")
+  lessonTags LessonTag[] @relation("LessonTagsTag")
+
+  @@unique([organizationId, name])
+  @@index([organizationId, name])
+}
+
+model CourseTag {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  courseId String @db.Uuid
+  tagId    String @db.Uuid
+
+  course Course @relation("CourseTagsCourse", fields: [courseId], references: [id], onDelete: Restrict)
+  tag    Tag    @relation("CourseTagsTag", fields: [tagId], references: [id], onDelete: Restrict)
+
+  @@unique([courseId, tagId])
+  @@index([courseId, tagId])
+}
+
+model LessonTag {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  lessonId String @db.Uuid
+  tagId    String @db.Uuid
+
+  lesson Lesson @relation("LessonTagsLesson", fields: [lessonId], references: [id], onDelete: Restrict)
+  tag    Tag    @relation("LessonTagsTag", fields: [tagId], references: [id], onDelete: Restrict)
+
+  @@unique([lessonId, tagId])
+  @@index([lessonId, tagId])
+}
+
+model Assignment {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  courseId String @db.Uuid
+  lessonId String? @db.Uuid
+  slug     String
+  title    String
+  dueAt    DateTime?
+
+  course Course @relation("CourseAssignments", fields: [courseId], references: [id], onDelete: Restrict)
+  lesson   Lesson?   @relation("LessonAssignments", fields: [lessonId], references: [id], onDelete: Restrict)
+
+  submissions AssignmentSubmission[] @relation("AssignmentSubmissions")
+  progressSnapshots ProgressSnapshot[] @relation("AssignmentProgressSnapshots")
+
+  @@unique([courseId, slug])
+  @@index([courseId, dueAt])
+  @@index([courseId, slug])
+}
+
+model AssignmentSubmission {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  assignmentId String @db.Uuid
+  userId       String @db.Uuid
+
+  status         String
+  submittedAt    DateTime?
+  responsePayload String?
+
+  assignment Assignment @relation("AssignmentSubmissions", fields: [assignmentId], references: [id], onDelete: Restrict)
+  user       User       @relation("UserAssignmentSubmissions", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([assignmentId, userId])
+  @@index([userId, assignmentId, status])
+}
+
+model Exam {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  courseId String @db.Uuid
+  slug     String
+  title    String
+  startsAt DateTime
+  endsAt   DateTime?
+
+  course     Course @relation("CourseExams", fields: [courseId], references: [id], onDelete: Restrict)
+  questions  ExamQuestion[] @relation("ExamQuestions")
+  attempts   ExamAttempt[] @relation("ExamAttempts")
+
+  @@unique([courseId, slug])
+  @@index([courseId, createdAt])
+}
+
+model ExamQuestion {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  examId       String @db.Uuid
+  questionNumber Int
+  prompt       String
+  questionType String
+
+  exam     Exam @relation("ExamQuestions", fields: [examId], references: [id], onDelete: Restrict)
+  responses ExamResponse[] @relation("ExamResponsesQuestion")
+
+  @@index([examId, questionNumber])
+  @@unique([examId, questionNumber])
+}
+
+model ExamAttempt {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  examId String @db.Uuid
+  userId String @db.Uuid
+
+  attemptNumber Int
+
+  status     String
+  startedAt  DateTime
+  finishedAt DateTime?
+
+  exam     Exam @relation("ExamAttempts", fields: [examId], references: [id], onDelete: Restrict)
+  user     User @relation("UserExamAttempts", fields: [userId], references: [id], onDelete: Restrict)
+  responses ExamResponse[] @relation("ExamResponsesAttempt")
+
+  @@unique([examId, userId, attemptNumber])
+  @@index([examId, userId, status])
+  @@index([userId, examId, createdAt])
+}
+
+model ExamResponse {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  examAttemptId  String @db.Uuid
+  examQuestionId String @db.Uuid
+  userId         String @db.Uuid
+
+  answerPayload String?
+
+  attempt  ExamAttempt @relation("ExamResponsesAttempt", fields: [examAttemptId], references: [id], onDelete: Cascade)
+  question ExamQuestion @relation("ExamResponsesQuestion", fields: [examQuestionId], references: [id], onDelete: Restrict)
+  user     User         @relation("UserExamResponses", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([examAttemptId, examQuestionId])
+  @@index([examQuestionId, examAttemptId])
+}
+
+model ProgressSnapshot {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  userId   String @db.Uuid
+  courseId String @db.Uuid
+  lessonId String? @db.Uuid
+  assignmentId String? @db.Uuid
+
+  snapshotJson String
+
+  user       User       @relation("UserProgressSnapshots", fields: [userId], references: [id], onDelete: Restrict)
+  course     Course     @relation("CourseProgressSnapshots", fields: [courseId], references: [id], onDelete: Restrict)
+  lesson     Lesson?    @relation("LessonProgressSnapshots", fields: [lessonId], references: [id], onDelete: Restrict)
+  assignment Assignment? @relation("AssignmentProgressSnapshots", fields: [assignmentId], references: [id], onDelete: Restrict)
+
+  @@index([userId, courseId])
+  @@index([userId, courseId, lessonId])
+}
+
+model Attachment {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  uploaderUserId String? @db.Uuid
+
+  fileRef   String
+  mimeType  String
+  sizeBytes BigInt
+
+  uploader User? @relation("UserAttachments", fields: [uploaderUserId], references: [id], onDelete: Restrict)
+
+  @@index([uploaderUserId])
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  userId String @db.Uuid
+
+  title  String
+  body   String
+  status String
+
+  user User @relation("UserNotifications", fields: [userId], references: [id], onDelete: Restrict)
+  reads NotificationRead[] @relation("NotificationReadsNotification")
+
+  @@index([userId, createdAt])
+}
+
+model NotificationRead {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  notificationId String @db.Uuid
+  userId         String @db.Uuid
+  readAt         DateTime?
+
+  notification Notification @relation("NotificationReadsNotification", fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation("NotificationReadsUser", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([notificationId, userId])
+  @@index([userId, notificationId])
+  @@index([notificationId, userId, readAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organizationId String @db.Uuid
+  userId         String? @db.Uuid
+
+  severity String
+  eventType String
+  metadataJson String
+
+  actorUser User? @relation("AuditLogsUser", fields: [userId], references: [id], onDelete: Restrict)
+  organization Organization @relation("AuditLogsOrganization", fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model EventLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  organizationId String @db.Uuid
+  userId         String? @db.Uuid
+
+  occurredAt DateTime
+  source     String
+  eventType  String
+  metadataJson String?
+
+  actorUser User? @relation("EventLogsUser", fields: [userId], references: [id], onDelete: Restrict)
+  organization Organization @relation("EventLogsOrganization", fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, occurredAt])
+  @@index([userId, occurredAt])
+}

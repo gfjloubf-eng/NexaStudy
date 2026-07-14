@@ -2,7 +2,9 @@ import { env } from './src/config/env';
 
 const databaseUrl = process.env.DATABASE_URL;
 
-export const prismaConfig = {
+// Prisma CLI (when run against a JS/TS config) expects the configuration to be the default export.
+// Keep backwards compatibility by also providing a named export.
+const prismaConfig = {
   // Prisma will load schema at backend/prisma/schema.prisma
   // This file is used by tooling that supports programmatic config.
   datasources: {
@@ -15,4 +17,8 @@ export const prismaConfig = {
     NODE_ENV: env.NODE_ENV,
   },
 };
+
+export { prismaConfig };
+export default prismaConfig;
+
 
