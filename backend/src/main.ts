@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
 import helmet from 'helmet';
-import compression from 'compression';
+import * as compression from 'compression';
 import { Logger, VersioningType, ValidationPipe } from '@nestjs/common';
 
 

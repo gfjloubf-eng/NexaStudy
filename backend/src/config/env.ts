@@ -5,7 +5,9 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
 
   // API
-  API_VERSION: z.string().default('v1'),
+  // Nest URI versioning expects the version token itself (e.g. "1"), not "v1".
+  API_VERSION: z.string().default('1'),
+
 
   // CORS
   CORS_ENABLED: z.coerce.boolean().default(true),
