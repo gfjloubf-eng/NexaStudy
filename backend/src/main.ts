@@ -6,15 +6,16 @@ import helmet from 'helmet';
 import * as compression from 'compression';
 import { Logger, VersioningType, ValidationPipe } from '@nestjs/common';
 
-
 import { appConfig } from './config/app';
-
-
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
   });
+
+
+
+
 
 
   // Global prefix
